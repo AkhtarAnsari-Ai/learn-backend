@@ -7,7 +7,7 @@ const videoSchema = new Schema(
       type: String, // TODO : clouudinay url
       required: true,
     },
-    thubnail: {
+    thumbnail: {
       type: String, // TODO : clouudinay url
       required: true,
     },
@@ -21,7 +21,7 @@ const videoSchema = new Schema(
     },
     duration: {
       type: Number,
-      requird: true,
+      required: true,
     },
     views: {
       type: Number,
