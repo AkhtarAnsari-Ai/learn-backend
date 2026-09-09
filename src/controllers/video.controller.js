@@ -113,7 +113,7 @@ const videoDetailsUpdate = asyncHandler(async (req, res) => {
   const videoUpdated = await Video.findByIdAndUpdate(
     videoId,
     {
-      $set:updatedData
+      $set: updatedData,
     },
     { new: true }
   );
