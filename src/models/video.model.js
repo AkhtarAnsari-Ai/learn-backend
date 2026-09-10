@@ -7,9 +7,15 @@ const videoSchema = new Schema(
       type: String, // TODO : clouudinay url
       required: true,
     },
+    videoFilePublicId: {
+      type: String,
+    },
     thumbnail: {
       type: String, // TODO : clouudinay url
       required: true,
+    },
+    thumbnailPublicId: {
+      type: String,
     },
     title: {
       type: String,
