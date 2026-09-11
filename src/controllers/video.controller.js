@@ -6,7 +6,7 @@ import {
   uploadOnCloudinary,
 } from "../utils/cloudinary.js";
 import { Video } from "../models/video.model.js";
-import { isValidObjectId } from "mongoose";
+import mongoose, { isValidObjectId } from "mongoose";
 
 const publishedVideo = asyncHandler(async (req, res) => {
   // TODO : get video from body
@@ -61,7 +61,87 @@ const publishedVideo = asyncHandler(async (req, res) => {
 });
 
 const getAllPublishedVideos = asyncHandler(async (req, res) => {
-  const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query;
+  const {
+    page = 1,
+    limit = 10,
+    query,
+    sortBy = "createdAt",
+    sortType = "desc",
+    userId,
+  } = req.query;
+
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+
+  const matchCondition = { isPublished: true };
+
+  // TODO : search query should match with title or description
+  if (query?.trim()) {
+    // Escape special characters for regex
+    const safeQuery = query.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    matchCondition.$or = [
+      { title: { $regex: safeQuery, $options: "i" } },
+      { description: { $regex: safeQuery, $options: "i" } },
+    ];
+  }
+
+  if (userId) {
+    if (!isValidObjectId(userId)) {
+      throw new ApiError(400, "Invalid user id");
+    }
+    matchCondition.owner = new mongoose.Schema.Types.ObjectId(userId);
+  }
+
+  const SORTABLE_FIELDS = ["createdAt", "views", "duration", "title"];
+  const sortField = SORTABLE_FIELDS.includes(sortBy) ? sortBy : "createdAt";
+  const sortOrder = String(sortType).toLowerCase() === "asc" ? 1 : -1;
+
+  const videoAggregate = Video.aggregate([
+    {
+      $match: matchCondition,
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "owner",
+        foreignField: "_id",
+        as: "owner",
+        pipeline: [
+          {
+            $project: {
+              username: 1,
+              fullName: 1,
+              avatar: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $addFields: {
+        owner: { $first: "$owner" },
+      },
+    },
+    {
+      $sort: {
+        [sortField]: sortOrder,
+      },
+    },
+  ]);
+
+  const options = [
+    (page = pageNum), 
+    (limit = limitNum)
+  ];
+
+  const videos = await Video.aggregatePaginate(videoAggregate, options);
+  if (!videos) {
+    throw new ApiError(500, "Error while fetching videos");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, videos, "Videos fetched successfully"));
 });
 
 const getVideoById = asyncHandler(async (req, res) => {
@@ -111,7 +191,6 @@ const videoDetailsUpdate = asyncHandler(async (req, res) => {
 });
 
 const updateThumbnail = asyncHandler(async (req, res) => {
-
   const thumbnailLocalPath = req.file?.path;
   if (!thumbnailLocalPath) {
     throw new ApiError(400, "Thumbnail file is required");
@@ -122,11 +201,20 @@ const updateThumbnail = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Failed to upload thumbnail to cloudinary");
   }
 
+  const deleteThumbnailFromCloudinary = await deleteFromCloudinary(
+    req.video?.thumbnailPublicId,
+    "image"
+  );
+  if (!deleteThumbnailFromCloudinary) {
+    throw new ApiError(500, "Failed to delete old thumbnail from cloudinary");
+  }
+
   const updatedThumbnail = await Video.findByIdAndUpdate(
     req.video?._id,
     {
       $set: {
         thumbnail: thumbnail?.url,
+        thumbnailPublicId: thumbnail?.public_id,
       },
     },
     { new: true }
@@ -144,7 +232,6 @@ const updateThumbnail = asyncHandler(async (req, res) => {
 });
 
 const deleteVideo = asyncHandler(async (req, res) => {
-
   const deletedVideo = await Video.findByIdAndDelete(req.video?._id);
   if (!deletedVideo) {
     throw new ApiError(500, "Error while deleting video");
@@ -167,16 +254,17 @@ const deleteVideo = asyncHandler(async (req, res) => {
   }
 
   return res
-  .status(200)
-  .json(
-    new ApiResponse(
-      200,deletedVideo, "Video and thumbnail  deleted successfully"
-    )
-  );
+    .status(200)
+    .json(
+      new ApiResponse(
+        200,
+        deletedVideo,
+        "Video and thumbnail  deleted successfully"
+      )
+    );
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
-
   req.video.isPublished = !req.video.isPublished;
   const videoUpdated = await req.video.save();
 

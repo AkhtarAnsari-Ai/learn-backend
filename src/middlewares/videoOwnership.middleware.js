@@ -1,4 +1,4 @@
-import { isValidObjectId } from "mongoose.js";
+import { isValidObjectId } from "mongoose";
 import { Video } from "../models/video.model.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
