@@ -89,7 +89,7 @@ const getAllPublishedVideos = asyncHandler(async (req, res) => {
     if (!isValidObjectId(userId)) {
       throw new ApiError(400, "Invalid user id");
     }
-    matchCondition.owner = new mongoose.Schema.Types.ObjectId(userId);
+    matchCondition.owner = new mongoose.Types.ObjectId(userId);
   }
 
   const SORTABLE_FIELDS = ["createdAt", "views", "duration", "title"];
@@ -129,10 +129,10 @@ const getAllPublishedVideos = asyncHandler(async (req, res) => {
     },
   ]);
 
-  const options = [
-    (page = pageNum), 
-    (limit = limitNum)
-  ];
+  const options = {
+    page : pageNum, 
+    limit : limitNum
+  };
 
   const videos = await Video.aggregatePaginate(videoAggregate, options);
   if (!videos) {
